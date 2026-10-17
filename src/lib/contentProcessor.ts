@@ -75,24 +75,6 @@ export function processContent(content: string, isDarkMode: boolean = false): st
       '<div class="video-container" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%"><iframe src="https://www.youtube.com/embed/$1?enablejsapi=1&playsinline=1&rel=0" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>'
     );
   
-    // Fix aspect ratio for images by adding specific styles
-    processedContent = processedContent.replace(
-      /<img(.*?)style="([^"]*?)(width|height):[^"]*?(width|height):[^"]*?"(.*?)>/gi,
-      '<img$1style="max-width:100%;height:auto;object-fit:contain;"$5 loading="lazy">'
-    );
-  
-    // Handle images with style but no width/height
-    processedContent = processedContent.replace(
-      /<img(.*?)style="(?!.*?(width|height))[^"]*?"(.*?)>/gi,
-      '<img$1style="max-width:100%;height:auto;object-fit:contain;"$3 loading="lazy">'
-    );
-  
-    // Handle images with no style
-    processedContent = processedContent.replace(
-      /<img(?![^>]*?style=)(.*?)>/gi,
-      '<img style="max-width:100%;height:auto;object-fit:contain;"$1 loading="lazy">'
-    );
-  
     // Process font sizes
     processedContent = processedContent.replace(
       /style="([^"]*)font-size:\s*(\d+)px([^"]*)"/g,
@@ -113,17 +95,6 @@ processedContent = processedContent.replace(
   }
 );
     
-    // Add IDs to headings for TOC (your existing code)
-    processedContent = processedContent.replace(
-      /<h([2-3])(?:\s[^>]*)?>(.*?)<\/h\1>/g,
-      (match, level, content) => {
-        const plainText = content.replace(/<[^>]*>/g, "");
-        const id = plainText.toLowerCase().replace(/[^\w]+/g, "-");
-        return `<h${level} id="${id}">${content}</h${level}>`;
-      }
-    );
-
-
     // FONT TAG COLOR TRANSFORMATION - Only if in dark mode
     if (isDarkMode) {
       processedContent = processedContent.replace(
@@ -186,11 +157,11 @@ processedContent = processedContent.replace(
     
     // Add IDs to headings for TOC
     processedContent = processedContent.replace(
-      /<h([2-3])(?:\s[^>]*)?>(.*?)<\/h\1>/g,
-      (match, level, content) => {
+      /<h([2-3])(\s[^>]*)?>(.*?)<\/h\1>/g,
+      (match, level, attrs = "", content) => {
         const plainText = content.replace(/<[^>]*>/g, "");
         const id = plainText.toLowerCase().replace(/[^\w]+/g, "-");
-        return `<h${level} id="${id}">${content}</h${level}>`;
+        return `<h${level}${attrs.replace(/\s+id=["'][^"']*["']/gi, "")} id="${id}">${content}</h${level}>`;
       }
     );
   

@@ -202,3 +202,12 @@ body {
 .loading-spinner {
   animation: spinner 0.75s linear infinite;
 }
+
+/* Mana image alignment and read-only task lists. Width stays responsive above. */
+.article-body img[data-align="left"] { margin-left: 0; margin-right: auto; }
+.article-body img[data-align="right"] { margin-left: auto; margin-right: 0; }
+.article-body img[data-align="center"] { margin-left: auto; margin-right: auto; }
+.article-body li:has(> input[type="checkbox"]),
+.article-body li:has(> p > input[type="checkbox"]) { list-style: none; }
+.article-body input[type="checkbox"] { margin-right: 0.5em; vertical-align: middle; }
+.article-body mark { color: #171717; padding: 0.05em 0.15em; border-radius: 0.15em; }
