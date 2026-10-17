@@ -16,6 +16,10 @@ export function getServiceRoleClient(): SupabaseClient {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  cached = createClient(url, key, { auth: { persistSession: false } });
+  cached = createClient(url, key, { auth: { persistSession: false }, global: { fetch: (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    // Uncached article reads verify publishing without changing public profile caching.
+    return fetch(input, new URL(url).pathname === '/rest/v1/posts' ? { ...init, cache: 'no-store' } : init);
+  } } });
   return cached;
 }

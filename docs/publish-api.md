@@ -27,13 +27,14 @@ Create or update a post. Upsert key is `slug`; omit it and the title is slugifie
 - `published` defaults to true. Send false to stage a draft on the blog.
 - `date` is only needed to backdate; on update it is unchanged unless sent.
 - Fields left out of an update keep their stored value (`categories`, `featuredImage`, `excerpt`, `featured`).
+- `featuredImage` is separate from body images. Send an empty string to clear it; omit it to preserve it.
 - Responses: `201` created, `200` updated, `400` validation (`{error}`), `401` token, `503` link post before the migration.
 
 ```json
 { "id": "uuid", "slug": "the-slug", "url": "https://blog.serdarsalim.com/posts/the-slug", "published": true, "post_type": "article", "created": true }
 ```
 
-The route revalidates `/`, `/posts/<slug>`, `/sitemap.xml` and `/feed.xml`, so the post is live when the response returns. `/api/latest-posts` (what serdarsalim.com reads) refreshes within 60 seconds.
+The route invalidates the `posts` data tag and revalidates `/`, `/blog`, `/posts/<slug>`, its social images, `/sitemap.xml` and `/feed.xml`. Public Supabase reads use the same tag; management reads bypass the data cache. Route regeneration happens on the next request, so an already-open browser page still needs a refresh. `/api/latest-posts` (what serdarsalim.com reads) refreshes within 60 seconds.
 
 ## GET /api/publish?limit=50
 
@@ -69,3 +70,7 @@ curl -s -X POST https://blog.serdarsalim.com/api/publish \
 ```
 
 Then `DELETE /api/publish/test-from-mana?permanent=1`.
+
+## Regression checks
+
+`npx ts-node --compiler-options '{"module":"CommonJS","moduleResolution":"node"}' tests/publishing.ts` verifies cache tags, uncached management reads and cover validation with mocked requests.

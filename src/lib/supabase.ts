@@ -43,7 +43,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Create Supabase client
 export const supabase = createClient(
   supabaseUrl || 'https://example.supabase.co', // Fallback to prevent crash
-  supabaseAnonKey || 'placeholder-key' // Fallback to prevent crash
+  supabaseAnonKey || 'placeholder-key', // Fallback to prevent crash
+  { global: { fetch: (input, init) => {
+    // These reads back every public view. Mutations invalidate the same tag.
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const method = init?.method || (input instanceof Request ? input.method : 'GET');
+    if (method === 'GET' && new URL(url).pathname === '/rest/v1/posts') {
+      const options = init as RequestInit & { next?: { tags?: string[]; revalidate?: number } };
+      return fetch(input, { ...options, next: { ...options?.next, tags: [...new Set([...(options?.next?.tags || []), 'posts'])], revalidate: 60 } } as RequestInit);
+    }
+    return fetch(input, init);
+  } } }
 );
 
 // Log initialization in development to help with debugging
