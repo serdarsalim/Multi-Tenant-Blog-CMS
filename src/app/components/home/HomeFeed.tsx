@@ -17,6 +17,7 @@ export default function HomeFeed({ items }: { items: FeedItem[] }) {
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const searchButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const categories = useMemo(() => {
     const counts = new Map<string, { label: string; count: number }>();
@@ -34,7 +35,7 @@ export default function HomeFeed({ items }: { items: FeedItem[] }) {
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
   }, [items]);
 
-  // Restore the last chip and honour ?search= after hydration, so the server HTML is deterministic.
+  // Restore the last topic and honour ?search= after hydration, so the server HTML is deterministic.
   useEffect(() => {
     try {
       const saved = localStorage.getItem(CATEGORY_STORAGE_KEY)?.toLowerCase().trim();
@@ -86,77 +87,86 @@ export default function HomeFeed({ items }: { items: FeedItem[] }) {
     return [...filtered.filter((i) => i.featured), ...filtered.filter((i) => !i.featured)];
   }, [items, fuse, query, category]);
 
-  const chip = (active: boolean) =>
-    `rounded-full border px-3 py-1 text-[13px] transition ${
+  const topicClass = (active: boolean) =>
+    `shrink-0 border-b-2 pb-4 pt-3 text-[13px] transition-colors ${
       active
-        ? "border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-200"
-        : "border-gray-200 bg-white text-gray-600 hover:border-orange-200 hover:text-gray-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-300 dark:hover:border-orange-900 dark:hover:text-white"
+        ? "border-orange-600 font-medium text-orange-700 dark:border-orange-400 dark:text-orange-300"
+        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-900 dark:text-gray-400 dark:hover:border-slate-600 dark:hover:text-white"
     }`;
 
   return (
-    <section className="mx-auto max-w-3xl px-4 pb-8 pt-8 sm:px-6" id="posts">
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => setCategory(ALL)} className={chip(category === ALL && !query)}>
-          All <span className="ml-1 text-xs text-gray-400 dark:text-gray-500">{items.length}</span>
-        </button>
-        {categories.map((c) => (
+    <section className="mx-auto max-w-3xl px-4 pb-8 pt-7 sm:px-6 sm:pt-8" id="posts">
+      <div className="flex items-start gap-5 border-b border-gray-200 dark:border-slate-800">
+        <div className="-mb-px flex min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Filter posts by topic">
           <button
-            key={c.key}
             type="button"
             onClick={() => {
-              setCategory(c.key);
+              setCategory(ALL);
               setQuery("");
             }}
-            className={chip(category === c.key && !query)}
+            aria-pressed={category === ALL && !query}
+            className={topicClass(category === ALL && !query)}
           >
-            {c.label}
+            All
           </button>
-        ))}
-
-        <div className="ml-auto flex items-center">
-          {searchOpen ? (
-            <div className="relative">
-              <svg className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M20 20l-3.5-3.5" />
-              </svg>
-              <input
-                ref={inputRef}
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onBlur={() => {
-                  if (!query.trim()) setSearchOpen(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setQuery("");
-                    setSearchOpen(false);
-                  }
-                }}
-                placeholder="Search posts"
-                aria-label="Search posts"
-                className="h-8 w-44 rounded-full border border-gray-200 bg-white pl-8 pr-3 text-[13px] text-gray-800 placeholder:text-gray-400 focus:border-orange-300 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100"
-              />
-            </div>
-          ) : (
+          {categories.map((c) => (
             <button
+              key={c.key}
               type="button"
-              onClick={() => setSearchOpen(true)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition hover:border-orange-200 hover:text-gray-900 dark:border-slate-700 dark:text-gray-400 dark:hover:text-white"
-              aria-label="Search posts"
+              onClick={() => {
+                setCategory(c.key);
+                setQuery("");
+              }}
+              aria-pressed={category === c.key && !query}
+              className={topicClass(category === c.key && !query)}
             >
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M20 20l-3.5-3.5" />
-              </svg>
+              {c.label}
             </button>
-          )}
+          ))}
         </div>
+        <button
+          ref={searchButtonRef}
+          type="button"
+          onClick={() => {
+            setSearchOpen(!searchOpen);
+            if (searchOpen) setQuery("");
+          }}
+          className="inline-flex shrink-0 items-center gap-2 py-3 text-[13px] text-gray-500 transition-colors hover:text-orange-700 dark:text-gray-400 dark:hover:text-orange-300"
+          aria-label="Search posts"
+          aria-expanded={searchOpen}
+          aria-controls="post-search"
+        >
+          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" />
+          </svg>
+          Search
+        </button>
       </div>
 
+      {searchOpen && (
+        <div className="mt-5" id="post-search">
+          <input
+            ref={inputRef}
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setQuery("");
+                setSearchOpen(false);
+                searchButtonRef.current?.focus();
+              }
+            }}
+            placeholder="Search titles, topics, and notes…"
+            aria-label="Search posts"
+            className="h-11 w-full rounded-md border border-gray-300 bg-transparent px-3 text-sm text-gray-800 placeholder:text-gray-500 dark:border-slate-600 dark:text-gray-100 dark:placeholder:text-gray-400"
+          />
+        </div>
+      )}
+
       {query.trim() && (
-        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400" role="status">
           {visible.length} result{visible.length === 1 ? "" : "s"} for “{query.trim()}”.{" "}
           <button type="button" onClick={() => setQuery("")} className="font-medium text-orange-700 hover:underline dark:text-orange-300">
             Clear
@@ -164,7 +174,7 @@ export default function HomeFeed({ items }: { items: FeedItem[] }) {
         </p>
       )}
 
-      <div className="mt-5 space-y-3">
+      <div className="divide-y divide-gray-200/80 dark:divide-slate-800">
         {visible.length === 0 ? (
           <p className="py-12 text-center text-gray-500 dark:text-gray-400">Nothing here yet. Try another category or search.</p>
         ) : (
