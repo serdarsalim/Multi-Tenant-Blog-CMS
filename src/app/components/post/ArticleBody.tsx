@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const CLASSES =
   "article-body prose prose-lg max-w-none dark:prose-invert " +
-  "prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-gray-900 dark:prose-headings:text-white " +
+  "prose-headings:font-sans prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-gray-900 dark:prose-headings:text-white " +
   "prose-h2:mt-10 prose-h2:mb-4 prose-h2:text-2xl prose-h3:mt-8 prose-h3:mb-3 prose-h3:text-xl prose-h4:text-lg " +
   "prose-p:my-4 prose-p:text-gray-800 dark:prose-p:text-gray-300 " +
   "prose-a:font-medium prose-a:text-orange-700 prose-a:no-underline hover:prose-a:underline dark:prose-a:text-orange-300 " +

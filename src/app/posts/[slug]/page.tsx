@@ -3,21 +3,21 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAllPosts, getPostBySlugServer, getPrimaryAuthorProfile, getRelatedPosts } from "@/lib/data";
-import { processContent, extractTableOfContents } from "@/lib/contentProcessor";
+import { processContent } from "@/lib/contentProcessor";
 import { SITE, formatDate, hostOf, postUrl, readingMinutes, stripHtml, summarize } from "@/lib/site";
 import JsonLd from "@/app/components/JsonLd";
-import TableOfContents from "@/app/components/blog/TableOfContents";
 import ShareButtons from "@/app/components/blog/ShareButtons";
 import CommentSection from "@/app/components/blog/CommentSection";
 import ArticleBody from "@/app/components/post/ArticleBody";
 import SourceCard from "@/app/components/post/SourceCard";
 import RelatedPosts from "@/app/components/post/RelatedPosts";
 import AdminEditButton from "@/app/components/post/AdminEditButton";
-import BackButton from "@/app/components/post/BackButton";
 
 export const revalidate = 60;
 
 type Params = { params: { slug: string } };
+
+const allPostsClass = "inline-flex items-center gap-2 py-2 text-sm font-semibold text-gray-800 transition-colors hover:text-orange-700 dark:text-gray-100 dark:hover:text-orange-300";
 
 export async function generateStaticParams() {
   const posts = await getAllPosts();
@@ -70,7 +70,6 @@ export default async function PostPage({ params }: Params) {
 
   const light = processContent(post.content, false);
   const dark = processContent(post.content, true);
-  const toc = extractTableOfContents(post.content);
   const minutes = readingMinutes(post.content);
   const isLink = post.post_type === "link" && !!post.source_url;
   const authorName = profile?.name?.trim() || SITE.name;
@@ -101,17 +100,22 @@ export default async function PostPage({ params }: Params) {
 
       <article className="mx-auto max-w-[42rem]">
         <header>
-          {post.categories.length > 0 && (
-            <p className="mb-3 flex flex-wrap gap-x-3 text-xs font-medium uppercase tracking-wide text-orange-700 dark:text-orange-300">
-              {post.categories.map((category) => (
-                <Link key={category} href={`/?category=${encodeURIComponent(category.toLowerCase())}`} className="hover:underline">
-                  {category}
-                </Link>
-              ))}
-            </p>
-          )}
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <Link href="/" className={`shrink-0 ${allPostsClass}`}>
+              <span className="text-lg" aria-hidden="true">←</span> All posts
+            </Link>
+            {post.categories.length > 0 && (
+              <p className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-right text-xs font-medium uppercase tracking-wide text-orange-700 dark:text-orange-300">
+                {post.categories.map((category) => (
+                  <Link key={category} href={`/?category=${encodeURIComponent(category.toLowerCase())}`} className="hover:underline">
+                    {category}
+                  </Link>
+                ))}
+              </p>
+            )}
+          </div>
 
-          <h1 className="text-[1.9rem] font-bold leading-[1.15] tracking-tight text-gray-900 dark:text-white sm:text-4xl">
+          <h1 className="font-sans text-[2rem] font-semibold leading-[1.15] tracking-tight text-gray-900 dark:text-white sm:text-[2.5rem]">
             {post.title}
           </h1>
 
@@ -154,26 +158,28 @@ export default async function PostPage({ params }: Params) {
 
         <div className="mt-8 border-t border-gray-200 dark:border-slate-800" />
 
-        <TableOfContents items={toc} />
-
         <ArticleBody light={light} dark={dark === light ? null : dark} />
 
         {isLink && <SourceCard url={post.source_url!} title={post.title} />}
 
-        <footer className="mt-12 border-t border-gray-200 pt-6 dark:border-slate-800">
-          {post.socmed && <ShareButtons title={post.title} url={postUrl(post.slug)} />}
-        </footer>
+        {(post.socmed || post.comment) && (
+          <footer className="mt-10 border-t border-gray-200 pt-5 dark:border-slate-800">
+            {post.comment ? (
+              <CommentSection slug={post.slug} share={post.socmed ? { title: post.title, url: postUrl(post.slug) } : undefined} />
+            ) : (
+              <ShareButtons title={post.title} url={postUrl(post.slug)} />
+            )}
+          </footer>
+        )}
       </article>
 
       <RelatedPosts posts={related} />
 
-      {post.comment && (
-        <div className="mx-auto mt-12 max-w-[42rem]">
-          <CommentSection slug={post.slug} />
-        </div>
-      )}
-
-      <BackButton />
+      <nav className="mx-auto mt-8 max-w-[42rem]" aria-label="Article navigation">
+        <Link href="/" className={allPostsClass}>
+          <span className="text-lg" aria-hidden="true">←</span> All posts
+        </Link>
+      </nav>
     </main>
   );
 }

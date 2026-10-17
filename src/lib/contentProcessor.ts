@@ -193,6 +193,14 @@ processedContent = processedContent.replace(
       }
     );
   
+    // Add punctuation to consecutive numbered sections, preserving their existing anchor IDs.
+    // Requiring a sequence starting at 1 leaves numeric headings such as years alone.
+    const numberedHeading = /(<h[23]\b[^>]*>(?:\s*<(?:span|strong|b|em|i)\b[^>]*>)*\s*)(\d{1,2})(?:\s|&nbsp;)+(?=[^\s<\d])/gi;
+    const numberedSections = [...processedContent.matchAll(numberedHeading)];
+    if (numberedSections.length > 1 && numberedSections.every((heading, index) => Number(heading[2]) === index + 1)) {
+      processedContent = processedContent.replace(numberedHeading, "$1$2. ");
+    }
+
     return processedContent;
   }
 

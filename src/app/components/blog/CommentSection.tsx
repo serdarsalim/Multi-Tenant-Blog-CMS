@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { signIn, useSession } from "next-auth/react";
+import ShareButtons from "./ShareButtons";
 
 interface CommentSectionProps {
   slug: string;
+  share?: { title: string; url: string };
 }
 
 type Comment = {
@@ -15,7 +17,7 @@ type Comment = {
   created_at: string;
 };
 
-export default function CommentSection({ slug }: CommentSectionProps) {
+export default function CommentSection({ slug, share }: CommentSectionProps) {
   const { data: session, status } = useSession();
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,14 @@ export default function CommentSection({ slug }: CommentSectionProps) {
   const [posting, setPosting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const composerId = useId();
+  const commentButtonRef = useRef<HTMLButtonElement | null>(null);
+  const draftRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (composerOpen && session) draftRef.current?.focus();
+  }, [composerOpen, session]);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,23 +138,44 @@ export default function CommentSection({ slug }: CommentSectionProps) {
   };
 
   return (
-    <div className="pt-4">
-      <div className="border-t border-gray-200 dark:border-gray-800 pt-8">
-        <h3 className="text-xl font-bold mb-6">Comments</h3>
-
+    <section aria-label="Comments">
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+        {share && <ShareButtons title={share.title} url={share.url} />}
+        <button
+          ref={commentButtonRef}
+          type="button"
+          onClick={() => setComposerOpen((open) => !open)}
+          aria-expanded={composerOpen}
+          aria-controls={composerId}
+          className="inline-flex items-center gap-2 py-1 text-sm text-gray-500 transition-colors hover:text-orange-700 dark:text-gray-400 dark:hover:text-orange-300"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          Leave a comment
+        </button>
+      </div>
+      <div hidden={!composerOpen} id={composerId} className="mt-4" onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          setComposerOpen(false);
+          commentButtonRef.current?.focus();
+        }
+      }}>
         {status === "loading" ? (
-          <div className="h-16 flex items-center text-sm text-gray-500">Loading session...</div>
+          <p className="text-sm text-gray-500 dark:text-gray-400" role="status">Loading sign-in...</p>
         ) : session ? (
-          <div className="mb-8 space-y-3">
+          <div className="space-y-3">
             <textarea
+              ref={draftRef}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="Write a comment..."
+              aria-label="Write a comment"
               className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 px-4 py-3 text-sm text-gray-800 dark:text-gray-200"
               rows={4}
             />
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
                 Signed in as {session.user?.name || session.user?.email}
               </span>
               <button
@@ -156,34 +187,30 @@ export default function CommentSection({ slug }: CommentSectionProps) {
                 {posting ? "Posting..." : "Post comment"}
               </button>
             </div>
-          </div>
-        ) : (
-          <div className="mb-8 flex flex-wrap items-center gap-3">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              Sign in to leave a comment.
-            </p>
+            </div>
+          ) : (
             <button
               type="button"
               onClick={() => signIn("google")}
-              className="px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 text-sm"
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:border-orange-400 hover:text-orange-700 dark:border-slate-700 dark:text-gray-300 dark:hover:text-orange-300"
             >
-              Sign in
+              Sign in to comment
             </button>
-          </div>
-        )}
+          )}
+      </div>
 
-        {loading ? (
-          <div className="h-16 flex items-center text-sm text-gray-500">Loading comments...</div>
-        ) : error ? (
-          <div className="text-sm text-red-600">{error}</div>
-        ) : comments.length === 0 ? (
-          <div className="text-sm text-gray-500">No comments yet.</div>
-        ) : (
-          <div className="space-y-4">
+      {loading && <p className="mt-3 text-sm text-gray-500 dark:text-gray-400" role="status">Loading comments...</p>}
+      {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>}
+      {comments.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-4 text-xl font-semibold text-gray-900 dark:text-gray-100">
+            Comments <span className="ml-1 text-sm font-normal text-gray-500 dark:text-gray-400">{comments.length}</span>
+          </h2>
+          <div className="divide-y divide-gray-200 dark:divide-slate-800">
             {comments.map((comment) => (
               <div
                 key={comment.id}
-                className="rounded-lg border border-gray-100 dark:border-gray-800 bg-white dark:bg-slate-900 px-4 py-3"
+                className="py-4 first:pt-0"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
@@ -202,7 +229,7 @@ export default function CommentSection({ slug }: CommentSectionProps) {
                     </button>
                   )}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {new Date(comment.created_at).toLocaleString()}
                 </div>
                 <p className="mt-2 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
@@ -211,8 +238,8 @@ export default function CommentSection({ slug }: CommentSectionProps) {
               </div>
             ))}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </section>
   );
 }
