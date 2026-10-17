@@ -74,3 +74,7 @@ Then `DELETE /api/publish/test-from-mana?permanent=1`.
 ## Regression checks
 
 `npx ts-node --compiler-options '{"module":"CommonJS","moduleResolution":"node"}' tests/publishing.ts` verifies cache tags, uncached management reads and cover validation with mocked requests.
+
+## YouTube videos
+
+A paragraph holding nothing but one YouTube link (watch, youtu.be, Shorts, live) renders as a click-to-play video: the thumbnail and a play button until clicked, then the reduced-cookie player with same-channel suggestions. A `t=` on the link becomes the start time. A link inside a sentence stays a link. Rendering only (`src/lib/youtube.ts`); the stored HTML keeps the plain link.

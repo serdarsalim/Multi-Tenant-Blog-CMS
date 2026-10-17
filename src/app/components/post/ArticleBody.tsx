@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
+import { playYouTube } from "@/lib/youtube";
 
 const CLASSES =
   "article-body prose prose-lg max-w-none dark:prose-invert " +
@@ -33,5 +34,10 @@ export default function ArticleBody({ light, dark }: { light: string; dark: stri
     return () => observer.disconnect();
   }, [light, dark]);
 
-  return <div className={CLASSES} dangerouslySetInnerHTML={{ __html: html }} />;
+  const onClick = (event: MouseEvent<HTMLDivElement>) => {
+    const play = (event.target as HTMLElement).closest<HTMLElement>(".yt-play");
+    if (play) playYouTube(play);
+  };
+
+  return <div className={CLASSES} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />;
 }

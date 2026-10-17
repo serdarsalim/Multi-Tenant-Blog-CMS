@@ -1,4 +1,5 @@
 // src/lib/contentProcessor.ts
+import { embedYouTube } from "./youtube";
 
 /**
  * Process HTML content with theme-specific adjustments
@@ -200,6 +201,8 @@ processedContent = processedContent.replace(
     if (numberedSections.length > 1 && numberedSections.every((heading, index) => Number(heading[2]) === index + 1)) {
       processedContent = processedContent.replace(numberedHeading, "$1$2. ");
     }
+
+    processedContent = embedYouTube(processedContent);
 
     return processedContent;
   }
