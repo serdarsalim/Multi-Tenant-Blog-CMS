@@ -111,7 +111,8 @@ export function validatePublishInput(body: unknown): Required<Pick<PublishInput,
   const slug = typeof b.slug === 'string' && b.slug.trim() ? slugify(b.slug) : undefined;
   if (typeof b.slug === 'string' && b.slug.trim() && !slug) throw new PublishError('slug has no usable characters');
 
-  const featuredImage = typeof b.featuredImage === 'string' ? b.featuredImage.trim() : '';
+  if (b.featuredImage !== undefined && typeof b.featuredImage !== 'string') throw new PublishError('featuredImage must be a URL or an empty string');
+  const featuredImage = typeof b.featuredImage === 'string' ? b.featuredImage.trim() : undefined;
   if (featuredImage && !isHttpUrl(featuredImage)) throw new PublishError('featuredImage must be an http(s) URL');
 
   let date: string | undefined;
@@ -127,7 +128,7 @@ export function validatePublishInput(body: unknown): Required<Pick<PublishInput,
     html,
     excerpt: typeof b.excerpt === 'string' ? b.excerpt.trim() : undefined,
     categories: b.categories === undefined ? undefined : normalizeCategories(b.categories),
-    featuredImage: featuredImage || undefined,
+    featuredImage,
     post_type,
     source_url: source_url || undefined,
     published: b.published === undefined ? true : Boolean(b.published),
@@ -164,7 +165,10 @@ async function getAuthorId(): Promise<string | null> {
 export function revalidatePost(slug: string) {
   revalidateTag('posts');
   revalidatePath('/', 'page');
+  revalidatePath('/blog', 'page');
   revalidatePath(`/posts/${slug}`, 'page');
+  revalidatePath(`/posts/${slug}/opengraph-image`);
+  revalidatePath(`/posts/${slug}/twitter-image`);
   revalidatePath('/sitemap.xml');
   revalidatePath('/feed.xml');
 }
