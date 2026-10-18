@@ -6,10 +6,11 @@ Posts are stored as HTML. Publisher converts markdown to HTML before calling.
 
 ## POST /api/publish
 
-Create or update a post. Upsert key is `slug`; omit it and the title is slugified. Re-publishing the same slug updates in place (same URL).
+Create or update a post. Send the post's `id` once you have one: the update then lands on that post even if its slug was renamed on the blog. Without `id`, the key is `slug` (omit it and the title is slugified), and a slug that was renamed away still finds its post. Once a post exists the blog owns its slug; the response always returns the current one, so callers should store it.
 
 ```json
 {
+  "id": "optional post id from an earlier response",
   "slug": "optional-explicit-slug",
   "title": "Required",
   "html": "<p>Required for articles. Serdar's take for link posts.</p>",
@@ -28,6 +29,7 @@ Create or update a post. Upsert key is `slug`; omit it and the title is slugifie
 - `date` is only needed to backdate; on update it is unchanged unless sent.
 - Fields left out of an update keep their stored value (`categories`, `featuredImage`, `featured`).
 - When `html` changes, omitting `excerpt` regenerates the summary from the new content. Send `excerpt` to override it. An unchanged body keeps its stored summary.
+- Generated summaries read body paragraphs only: headings, images, and paragraphs that are all italics or links (captions, locations, photo credits) are skipped.
 - `featuredImage` is separate from body images. Send an empty string to clear it; omit it to preserve it.
 - Responses: `201` created, `200` updated, `400` validation (`{error}`), `401` token, `503` link post before the migration.
 
@@ -41,11 +43,11 @@ The route invalidates the `posts` data tag and revalidates `/`, `/blog`, `/posts
 
 Inventory: `{ posts: [{id, slug, title, excerpt, date, categories, featuredImage, published, featured, updated_at, post_type, source_url, url}], migration_applied: bool }`.
 
-## GET /api/publish/:slug
+## GET /api/publish/:slugOrId
 
-Full row including `content` (HTML), plus `url`. 404 if unknown.
+Full row including `content` (HTML), plus `url`. Accepts the slug or the post id. 404 if unknown.
 
-## DELETE /api/publish/:slug
+## DELETE /api/publish/:slugOrId
 
 Unpublishes (row stays, `published=false`). `?permanent=1` deletes the row. Both revalidate.
 
@@ -79,3 +81,7 @@ Then `DELETE /api/publish/test-from-mana?permanent=1`.
 ## YouTube videos
 
 A paragraph holding nothing but one YouTube link (watch, youtu.be, Shorts, live) renders as a click-to-play video: the thumbnail and a play button until clicked, then the reduced-cookie player with same-channel suggestions. A `t=` on the link becomes the start time. A link inside a sentence stays a link. Rendering only (`src/lib/youtube.ts`); the stored HTML keeps the plain link.
+
+## Renamed slugs
+
+Renaming a slug in the admin editor records the old one (`post_slug_redirects`, migration `supabase/migrations/20261019000000_post_slug_redirects.sql`, run once in the SQL editor). `/posts/<old>` then answers with a permanent redirect to the current address. Saving rewritten content in the admin editor regenerates the summary unless the summary field itself was changed.

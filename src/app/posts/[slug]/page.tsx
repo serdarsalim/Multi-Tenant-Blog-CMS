@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getAllPosts, getPostBySlugServer, getPrimaryAuthorProfile, getRelatedPosts } from "@/lib/data";
+import { currentSlugFor } from "@/lib/slug-redirects";
 import { processContent } from "@/lib/contentProcessor";
 import { SITE, formatDate, hostOf, postUrl, readingMinutes, stripHtml, summarize } from "@/lib/site";
 import JsonLd from "@/app/components/JsonLd";
@@ -63,7 +64,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function PostPage({ params }: Params) {
   const post = await getPostBySlugServer(params.slug);
-  if (!post) notFound();
+  if (!post) {
+    // A renamed post: send old links (homepage, shares) to its current address.
+    const moved = await currentSlugFor(params.slug);
+    if (moved) permanentRedirect(`/posts/${encodeURIComponent(moved)}`);
+    notFound();
+  }
 
   const primaryEmail = process.env.PRIMARY_AUTHOR_EMAIL || "serdar.dom@gmail.com";
   const [related, profile] = await Promise.all([getRelatedPosts(post, 3), getPrimaryAuthorProfile(primaryEmail)]);

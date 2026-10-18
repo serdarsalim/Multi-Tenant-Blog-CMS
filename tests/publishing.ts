@@ -49,6 +49,19 @@ async function main() {
   existing = null;
   await upsertPost(validatePublishInput({slug:'new-post',title:'New',html}));
   assert.equal(writes.at(-1)?.excerpt,autoExcerpt(html));
+  const mosques = '<p>Here are some of the most beautiful mosques in the world.&nbsp;</p><h2>Yıldız Hamidiye Camii</h2><p><em>Beşiktaş, Istanbul</em></p><p><img src="https://images.test/a.webp" alt="Interior"></p><p><em>Photo: <a href="https://pexels.test">Yasir</a> on <a href="https://pexels.test">Pexels</a></em></p><p>Built in <strong>1884</strong> for Sultan Abdülhamid II.</p><p><a href="https://pexels.test">Photo on Pexels</a> · <a href="https://wiki.test">History</a></p>';
+  assert.equal(autoExcerpt(mosques), 'Here are some of the most beautiful mosques in the world. Built in 1884 for Sultan Abdülhamid II.');
+  assert.equal(autoExcerpt('<h2>Only a heading</h2>'), 'Only a heading');
+  const postId = '16e7f921-c51f-4dc2-952a-01904b8092f6';
+  assert.equal(validatePublishInput({...base,id:postId}).id, postId);
+  assert.throws(()=>validatePublishInput({...base,id:'not-an-id'}));
+  existing = {id:postId,slug:'my-favorite-istanbul-mosques',date:'2026-10-17',content:'<p>Old.</p>',excerpt:'Old summary'};
+  const renamed = await upsertPost(validatePublishInput({id:postId,slug:'about-common-sense-3f10d2b7',title:'My Favorite Istanbul Mosques',html:mosques}));
+  assert.equal(renamed.slug,'my-favorite-istanbul-mosques'); assert.equal(renamed.created,false);
+  assert.equal(writes.at(-1)?.slug,'my-favorite-istanbul-mosques');
+  assert.equal(writes.at(-1)?.excerpt,autoExcerpt(mosques));
+  assert.ok(invalidations.includes('/posts/my-favorite-istanbul-mosques') && !invalidations.includes('/posts/about-common-sense-3f10d2b7'));
+  console.log('PASS: excerpts skip headings, captions, credits and link lines; publishing by post id keeps the blog\'s slug and never duplicates a renamed post.');
   console.log('PASS: refreshed excerpts on rewrites, preserved summaries on metadata updates, explicit overrides, empty clearing, create defaults and cache invalidation.');
   console.log('PASS: tagged public reads, uncached management reads, featured-image validation and clearing. All requests mocked.');
 }

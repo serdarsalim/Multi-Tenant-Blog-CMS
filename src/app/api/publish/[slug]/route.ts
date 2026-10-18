@@ -3,10 +3,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorizedPublisher, unauthorized } from '@/lib/publish-auth';
 import { SITE_URL, revalidatePost } from '@/lib/publish';
 import { getServiceRoleClient } from '@/lib/supabase-admin';
+import { POST_ID_PATTERN } from '@/lib/slug-redirects';
 
 export const dynamic = 'force-dynamic';
 
 type Params = { params: { slug: string } };
+
+// The segment is a slug or a post id; the Publisher uses ids so renames on the
+// blog don't strand its copy.
+const keyColumn = (key: string) => (POST_ID_PATTERN.test(key) ? 'id' : 'slug');
 
 export async function GET(request: NextRequest, { params }: Params) {
   if (!isAuthorizedPublisher(request)) return unauthorized();
@@ -14,7 +19,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const { data, error } = await getServiceRoleClient()
     .from('posts')
     .select('*')
-    .eq('slug', params.slug)
+    .eq(keyColumn(params.slug), params.slug)
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -30,7 +35,11 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const client = getServiceRoleClient();
   const permanent = request.nextUrl.searchParams.get('permanent') === '1';
 
-  const { data: existing } = await client.from('posts').select('id').eq('slug', params.slug).maybeSingle();
+  const { data: existing } = await client
+    .from('posts')
+    .select('id, slug')
+    .eq(keyColumn(params.slug), params.slug)
+    .maybeSingle();
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { error } = permanent
@@ -42,6 +51,6 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  revalidatePost(params.slug);
-  return NextResponse.json({ slug: params.slug, published: false, deleted: permanent });
+  revalidatePost(existing.slug);
+  return NextResponse.json({ slug: existing.slug, published: false, deleted: permanent });
 }

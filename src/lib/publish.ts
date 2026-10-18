@@ -2,6 +2,7 @@
 // Shared logic behind /api/publish: validation, slugging, upsert, revalidation.
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { getServiceRoleClient } from './supabase-admin';
+import { POST_ID_PATTERN, postIdForOldSlug } from './slug-redirects';
 
 export const SITE_URL = 'https://blog.serdarsalim.com';
 export const AUTHOR = { name: 'Serdar Salim', handle: 'slm' };
@@ -9,6 +10,7 @@ export const AUTHOR = { name: 'Serdar Salim', handle: 'slm' };
 export type PostType = 'article' | 'link';
 
 export type PublishInput = {
+  id?: string;
   slug?: string;
   title: string;
   html: string;
@@ -72,17 +74,31 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+const ENTITIES: Record<string, string> = { '&nbsp;': ' ', '&amp;': '&', '&quot;': '"', '&#39;': "'", '&lt;': '<', '&gt;': '>' };
+
 function plainText(html: string): string {
   return html
     .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
+    .replace(/&(?:nbsp|amp|quot|#39|lt|gt);/g, (entity) => ENTITIES[entity])
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+// Paragraphs that carry the article's own words. Headings never count, and a
+// paragraph with no text outside italics and links is a caption, location
+// line, photo credit or image, so it is skipped too.
+function proseParagraphs(html: string): string[] {
+  const prose: string[] = [];
+  for (const [, inner] of html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const ownWords = plainText(inner.replace(/<(em|i|a)\b[^>]*>[\s\S]*?<\/\1>/gi, ' '));
+    if (/\p{L}/u.test(ownWords)) prose.push(plainText(inner));
+  }
+  return prose;
+}
+
 export function autoExcerpt(html: string, max = 200): string {
-  const text = plainText(html);
+  const prose = proseParagraphs(html);
+  const text = prose.length ? prose.join(' ') : plainText(html);
   if (text.length <= max) return text;
   const cut = text.slice(0, max);
   return `${cut.slice(0, cut.lastIndexOf(' ') > 80 ? cut.lastIndexOf(' ') : max).trim()}…`;
@@ -108,6 +124,9 @@ export function validatePublishInput(body: unknown): Required<Pick<PublishInput,
   }
   if (!html.trim() && post_type === 'article') throw new PublishError('html is required for an article');
 
+  const id = typeof b.id === 'string' ? b.id.trim() : undefined;
+  if (b.id !== undefined && b.id !== null && !(id && POST_ID_PATTERN.test(id))) throw new PublishError('id must be a post id');
+
   const slug = typeof b.slug === 'string' && b.slug.trim() ? slugify(b.slug) : undefined;
   if (typeof b.slug === 'string' && b.slug.trim() && !slug) throw new PublishError('slug has no usable characters');
 
@@ -123,6 +142,7 @@ export function validatePublishInput(body: unknown): Required<Pick<PublishInput,
   }
 
   return {
+    id: id || undefined,
     slug,
     title,
     html,
@@ -184,20 +204,30 @@ export type PublishResult = {
 
 export async function upsertPost(input: ReturnType<typeof validatePublishInput>): Promise<PublishResult> {
   const client = getServiceRoleClient();
-  const slug = input.slug || slugify(input.title);
-  if (!slug) throw new PublishError('Could not derive a slug from the title');
+  const requestedSlug = input.slug || slugify(input.title);
+  if (!requestedSlug) throw new PublishError('Could not derive a slug from the title');
 
   const linkColumns = await hasLinkColumns();
   if (input.post_type === 'link' && !linkColumns) {
     throw new PublishError('Link posts need the post_type migration (supabase/migrations/20261010120000_post_type.sql)', 503);
   }
 
-  const { data: existing, error: lookupError } = await client
-    .from('posts')
-    .select('id, date, excerpt, content')
-    .eq('slug', slug)
-    .maybeSingle();
-  if (lookupError) throw new PublishError(`Lookup failed: ${lookupError.message}`, 500);
+  // Update the caller's post when it names one, so a slug renamed on the blog
+  // never spawns a second copy. A stale slug that redirects counts as well.
+  const fields = 'id, slug, date, excerpt, content';
+  const findBy = async (column: 'id' | 'slug', value: string) => {
+    const { data, error } = await client.from('posts').select(fields).eq(column, value).maybeSingle();
+    if (error) throw new PublishError(`Lookup failed: ${error.message}`, 500);
+    return data;
+  };
+  let existing = input.id ? await findBy('id', input.id) : null;
+  if (!existing) existing = await findBy('slug', requestedSlug);
+  if (!existing) {
+    const movedTo = await postIdForOldSlug(requestedSlug);
+    if (movedTo) existing = await findBy('id', movedTo);
+  }
+  // The blog owns the address once a post exists.
+  const slug: string = existing?.slug || requestedSlug;
 
   const now = new Date().toISOString();
   const record: Record<string, unknown> = {

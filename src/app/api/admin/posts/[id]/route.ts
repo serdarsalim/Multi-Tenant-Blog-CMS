@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { getServerSession } from 'next-auth';
 import { authOptions, getServiceRoleClient } from '@/lib/auth-config';
+import { autoExcerpt } from '@/lib/publish';
+import { rememberSlugChange } from '@/lib/slug-redirects';
 
 function normalizeCategories(input: unknown): string[] | undefined {
   if (input === undefined) return undefined;
@@ -42,12 +44,12 @@ async function ensureAdmin() {
   return { author };
 }
 
-async function triggerRevalidation(slug?: string) {
+async function triggerRevalidation(...slugs: (string | undefined)[]) {
   try {
     revalidateTag('posts');
     revalidatePath('/', 'page');
     revalidatePath('/blog', 'page');
-    if (slug) {
+    for (const slug of new Set(slugs.filter(Boolean))) {
       revalidatePath(`/posts/${slug}`, 'page');
     }
   } catch (error) {
@@ -99,7 +101,21 @@ export async function PATCH(
       updates.categories = categories;
     }
 
-    const { data, error } = await getServiceRoleClient()
+    const client = getServiceRoleClient();
+    const { data: before } = await client
+      .from('posts')
+      .select('slug, content, excerpt')
+      .eq('id', id)
+      .maybeSingle();
+
+    // Rewritten content gets a fresh summary unless the summary itself was edited.
+    const contentChanged = typeof updates.content === 'string' && updates.content !== before?.content;
+    const excerptEdited = 'excerpt' in updates && updates.excerpt !== before?.excerpt;
+    if (contentChanged && !excerptEdited) {
+      updates.excerpt = autoExcerpt(updates.content as string);
+    }
+
+    const { data, error } = await client
       .from('posts')
       .update(updates)
       .eq('id', id)
@@ -111,7 +127,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Failed to update post' }, { status: 500 });
     }
 
-    await triggerRevalidation(data.slug);
+    if (before?.slug && before.slug !== data.slug) {
+      await rememberSlugChange(id, before.slug, data.slug);
+    }
+    await triggerRevalidation(data.slug, before?.slug);
 
     return NextResponse.json({ post: data });
   } catch (error) {
