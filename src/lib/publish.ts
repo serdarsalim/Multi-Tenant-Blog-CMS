@@ -194,7 +194,7 @@ export async function upsertPost(input: ReturnType<typeof validatePublishInput>)
 
   const { data: existing, error: lookupError } = await client
     .from('posts')
-    .select('id, date, excerpt')
+    .select('id, date, excerpt, content')
     .eq('slug', slug)
     .maybeSingle();
   if (lookupError) throw new PublishError(`Lookup failed: ${lookupError.message}`, 500);
@@ -204,7 +204,10 @@ export async function upsertPost(input: ReturnType<typeof validatePublishInput>)
     slug,
     title: input.title,
     content: input.html,
-    excerpt: input.excerpt ?? (existing?.excerpt || autoExcerpt(input.html)),
+    // A rewritten article needs a summary of its current content. Preserve a
+    // custom summary on metadata-only updates; callers can still supply one.
+    excerpt: input.excerpt ?? (existing?.content === input.html && existing.excerpt
+      ? existing.excerpt : autoExcerpt(input.html)),
     published: input.published,
     author: AUTHOR.name,
     author_handle: AUTHOR.handle,

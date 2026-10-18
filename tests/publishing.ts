@@ -11,12 +11,45 @@ async function main() {
   assert.ok(options.next.tags.includes('posts')); assert.equal(options.next.revalidate,60);
   const {getServiceRoleClient} = await import('../src/lib/supabase-admin');
   await getServiceRoleClient().from('posts').select('*'); assert.equal(calls.pop()?.cache,'no-store');
-  const {validatePublishInput} = await import('../src/lib/publish');
+  const cache = require('next/cache');
+  const invalidations: string[] = [];
+  cache.revalidateTag = (tag: string) => { invalidations.push(tag); };
+  cache.revalidatePath = (path: string) => { invalidations.push(path); };
+  const {validatePublishInput, upsertPost, autoExcerpt} = await import('../src/lib/publish');
   const base={title:'Title',html:'<p>Body</p>'};
   assert.equal(validatePublishInput(base).featuredImage,undefined);
   assert.equal(validatePublishInput({...base,featuredImage:''}).featuredImage,'');
   assert.equal(validatePublishInput({...base,featuredImage:'https://images.test/cover.webp'}).featuredImage,'https://images.test/cover.webp');
   assert.throws(()=>validatePublishInput({...base,featuredImage:'javascript:alert(1)'}));
+  let existing: Record<string, unknown> | null = {id:'post-1',date:'2026-10-17',content:'<p>Old common sense article.</p>',excerpt:'Old common sense summary'};
+  const writes: Record<string, unknown>[] = [];
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+    const method = init?.method || 'GET';
+    if (url.pathname === '/rest/v1/authors') return Response.json([]);
+    if (method === 'GET') {
+      assert.equal(init?.cache, 'no-store');
+      return Response.json(url.searchParams.get('select') === 'post_type,source_url' ? [{post_type:'article',source_url:null}] : existing ? [existing] : []);
+    }
+    writes.push(JSON.parse(String(init?.body)));
+    return Response.json({id:'post-1'});
+  };
+  const html = '<h2>Yıldız Hamidiye Camii</h2><p>Built beside Yıldız Palace in Istanbul.</p>';
+  await upsertPost(validatePublishInput({slug:'test-post',title:'Istanbul mosques',html}));
+  assert.equal(writes.at(-1)?.excerpt, autoExcerpt(html));
+  assert.ok(!String(writes.at(-1)?.excerpt).includes('common sense'));
+  assert.ok(invalidations.includes('posts') && invalidations.includes('/') && invalidations.includes('/posts/test-post'));
+  existing = {...existing,content:html,excerpt:'An explicitly written summary'};
+  await upsertPost(validatePublishInput({slug:'test-post',title:'Updated title',html,categories:['Travel']}));
+  assert.equal(writes.at(-1)?.excerpt,'An explicitly written summary');
+  await upsertPost(validatePublishInput({slug:'test-post',title:'Updated title',html:'<p>Another body.</p>',excerpt:'Chosen summary'}));
+  assert.equal(writes.at(-1)?.excerpt,'Chosen summary');
+  await upsertPost(validatePublishInput({slug:'test-post',title:'Updated title',html,excerpt:''}));
+  assert.equal(writes.at(-1)?.excerpt,'');
+  existing = null;
+  await upsertPost(validatePublishInput({slug:'new-post',title:'New',html}));
+  assert.equal(writes.at(-1)?.excerpt,autoExcerpt(html));
+  console.log('PASS: refreshed excerpts on rewrites, preserved summaries on metadata updates, explicit overrides, empty clearing, create defaults and cache invalidation.');
   console.log('PASS: tagged public reads, uncached management reads, featured-image validation and clearing. All requests mocked.');
 }
 void main();

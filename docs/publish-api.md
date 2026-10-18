@@ -13,7 +13,7 @@ Create or update a post. Upsert key is `slug`; omit it and the title is slugifie
   "slug": "optional-explicit-slug",
   "title": "Required",
   "html": "<p>Required for articles. Serdar's take for link posts.</p>",
-  "excerpt": "Optional. Derived from html on first publish if missing.",
+  "excerpt": "Optional. Derived from html when missing on new or rewritten content.",
   "categories": ["Automation", "Personal growth"],
   "featuredImage": "https://.../cover.webp",
   "post_type": "article",
@@ -26,7 +26,8 @@ Create or update a post. Upsert key is `slug`; omit it and the title is slugifie
 
 - `published` defaults to true. Send false to stage a draft on the blog.
 - `date` is only needed to backdate; on update it is unchanged unless sent.
-- Fields left out of an update keep their stored value (`categories`, `featuredImage`, `excerpt`, `featured`).
+- Fields left out of an update keep their stored value (`categories`, `featuredImage`, `featured`).
+- When `html` changes, omitting `excerpt` regenerates the summary from the new content. Send `excerpt` to override it. An unchanged body keeps its stored summary.
 - `featuredImage` is separate from body images. Send an empty string to clear it; omit it to preserve it.
 - Responses: `201` created, `200` updated, `400` validation (`{error}`), `401` token, `503` link post before the migration.
 
