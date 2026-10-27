@@ -31,13 +31,13 @@ export type SitePreferences = {
 
 // Get Supabase credentials
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 // Check if credentials are available and log appropriately
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('⚠️ Missing Supabase credentials in environment variables:');
   if (!supabaseUrl) console.error('- NEXT_PUBLIC_SUPABASE_URL is missing');
-  if (!supabaseAnonKey) console.error('- NEXT_PUBLIC_SUPABASE_ANON_KEY is missing');
+  if (!supabaseAnonKey) console.error('- NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is missing');
 }
 
 // Create Supabase client

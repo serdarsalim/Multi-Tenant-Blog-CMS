@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://database.test';
-process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon';
-process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service';
+process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'test-anon';
+process.env.SUPABASE_SECRET_KEY = 'test-service';
 const calls: RequestInit[] = [];
 globalThis.fetch = async (_input, init) => { calls.push(init || {}); return new Response('[]', {headers:{'Content-Type':'application/json'}}); };
 async function main() {

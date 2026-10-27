@@ -8,12 +8,11 @@ export function getServiceRoleClient(): SupabaseClient {
   if (cached) return cached;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  // SUPABASE_SERVICE_ROLE_KEY is the canonical name. SUPABASE_SERVICE_KEY is the old one
-  // and is only read so an un-renamed Vercel env keeps working.
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  // Supabase secret key (sb_secret_...), kept in sync by the Supabase Vercel integration.
+  const key = process.env.SUPABASE_SECRET_KEY;
 
   if (!url || !key) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY');
   }
 
   cached = createClient(url, key, { auth: { persistSession: false }, global: { fetch: (input, init) => {
